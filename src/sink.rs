@@ -1,6 +1,8 @@
+use crate::print;
 use crate::print::{Printer, StdoutPrinter};
 use grep::searcher::{Searcher, Sink, SinkContext, SinkMatch};
 use std::error;
+use std::io;
 use termion::color;
 use thiserror::Error;
 
@@ -12,6 +14,32 @@ pub(crate) struct ContextPrintingSink<P: Printer> {
 enum Error {
 	#[error("The given searcher does not have passthru enabled. This is required for proper functionality")]
 	NoPassthruOnSearcher,
+	#[error("Print failure: {0}")]
+	PrintFailed(io::Error),
+}
+
+impl From<print::Error> for Error {
+	fn from(err: print::Error) -> Self {
+		let io_err = match err {
+			print::Error::BrokenPipe(wrapped) | print::Error::Other(wrapped) => wrapped,
+		};
+
+		Error::PrintFailed(io_err)
+	}
+}
+
+impl<P: Printer> ContextPrintingSink<P> {
+	// TODO: this box should really just return an Error.
+	fn get_sink_result_for_print_result(res: print::Result) -> Result<bool, Box<dyn error::Error>> {
+		match res {
+			// TODO: get rid of this boxing
+			Err(print::Error::Other(_)) => Err(Box::new(Error::from(res.unwrap_err()))),
+			// It is not an error case to have a broken pipe; it just means we can't output anything more and we
+			// shouldn't keep searching
+			Err(print::Error::BrokenPipe(_)) => Ok(false),
+			Ok(_) => Ok(true),
+		}
+	}
 }
 
 impl ContextPrintingSink<StdoutPrinter> {
@@ -49,12 +77,12 @@ impl<P: Printer> Sink for ContextPrintingSink<P> {
 	) -> Result<bool, Self::Error> {
 		Self::validate_searcher(searcher)?;
 
-		self.printer.colored_print(
+		let print_res = self.printer.colored_print(
 			color::Fg(color::Red),
 			std::str::from_utf8(sink_match.bytes()).unwrap(),
 		);
 
-		Ok(true)
+		Self::get_sink_result_for_print_result(print_res)
 	}
 
 	fn context(
@@ -65,9 +93,9 @@ impl<P: Printer> Sink for ContextPrintingSink<P> {
 		Self::validate_searcher(searcher)?;
 
 		let data = std::str::from_utf8(context.bytes()).unwrap();
-		self.printer.print(data);
+		let print_res = self.printer.print(data);
 
-		Ok(true)
+		Self::get_sink_result_for_print_result(print_res)
 	}
 }
 
@@ -78,23 +106,47 @@ mod tests {
 	use grep::searcher::SearcherBuilder;
 	use std::cell::RefCell;
 	use std::fmt;
+	use std::io;
 	use test_case::test_case;
 
 	#[derive(Default)]
 	struct MockPrinter {
 		messages: RefCell<Vec<String>>,
 		colored_messages: RefCell<Vec<String>>,
+		next_error: RefCell<Option<print::Error>>,
+	}
+
+	impl MockPrinter {
+		fn fail_next(&mut self, error: print::Error) {
+			self.next_error.replace(Some(error));
+		}
 	}
 
 	impl Printer for &MockPrinter {
-		fn print<S: fmt::Display>(&self, msg: S) {
+		fn print<S: fmt::Display>(&self, msg: S) -> print::Result {
 			self.messages.borrow_mut().push(msg.to_string());
+
+			if self.next_error.borrow().is_some() {
+				Err(self.next_error.replace(None).unwrap())
+			} else {
+				Ok(())
+			}
 		}
 
-		fn colored_print<S: fmt::Display, C: color::Color>(&self, _color: color::Fg<C>, msg: S) {
+		fn colored_print<S: fmt::Display, C: color::Color>(
+			&self,
+			_color: color::Fg<C>,
+			msg: S,
+		) -> print::Result {
 			// Unfortunately, termion colors don't implement PartialEq, so checking for the exact color is not
 			// feasible unless we wanted to write a wrapper, which I don't care enough to just for unit testing
 			self.colored_messages.borrow_mut().push(msg.to_string());
+
+			if self.next_error.borrow().is_some() {
+				Err(self.next_error.replace(None).unwrap())
+			} else {
+				Ok(())
+			}
 		}
 	}
 
@@ -126,11 +178,11 @@ mod tests {
 			printer: &mock_printer,
 		};
 
-		let res = SearcherBuilder::new()
-			.line_number(true)
-			.passthru(true)
-			.build()
-			.search_slice(matcher, LIPSUM.as_bytes(), sink);
+		let res = SearcherBuilder::new().passthru(true).build().search_slice(
+			matcher,
+			LIPSUM.as_bytes(),
+			sink,
+		);
 		if let Err(err) = res {
 			panic!("failed to search: {}", err)
 		}
@@ -161,6 +213,39 @@ mod tests {
 			expected_uncolored_messages,
 			colored_messages,
 		);
+	}
+
+	#[test_case(".", 0, 1; "failure on first match will only attempt to print that match")]
+	#[test_case("this doesn't appear in lorem ipsum", 1, 0; "never matching will only attempt to print the first line")]
+	fn test_does_not_attempt_to_print_after_broken_pipe_error(
+		pattern: &str,
+		num_uncolored_messages: usize,
+		num_colored_messages: usize,
+	) {
+		let matcher = RegexMatcher::new(pattern).expect("regexp doesn't compile");
+
+		let mut mock_printer = MockPrinter::default();
+
+		let broken_pipe_err =
+			print::Error::from(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"));
+		mock_printer.fail_next(broken_pipe_err);
+
+		let sink = ContextPrintingSink {
+			printer: &mock_printer,
+		};
+
+		let res = SearcherBuilder::new().passthru(true).build().search_slice(
+			matcher,
+			LIPSUM.as_bytes(),
+			sink,
+		);
+
+		assert!(!res.is_err(), "failed to search: {:?}", res.unwrap_err());
+		assert_eq!(
+			num_colored_messages,
+			mock_printer.colored_messages.borrow().len()
+		);
+		assert_eq!(num_uncolored_messages, mock_printer.messages.borrow().len());
 	}
 
 	// TODO: This is a bit overkill for a single setting, and could probably be simplified
