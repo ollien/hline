@@ -3,7 +3,7 @@ use std::fmt;
 use std::io;
 use std::io::Write;
 use std::result;
-use termion::color::{Color, Fg};
+use termion::color::{Color, Fg, Reset};
 use thiserror::Error;
 
 pub(crate) type Result = result::Result<(), Error>;
@@ -48,7 +48,7 @@ pub trait Printer {
 	/// specify whether or not this error was due to some kind of broken pipe error, which callers may choose to
 	/// execute specific behavior. The docs of [enum@Error] specify more information about this.
 	fn colored_print<S: fmt::Display, C: Color>(&self, color: Fg<C>, msg: S) -> Result {
-		let colored_message = format!("{}{}", color, msg);
+		let colored_message = format!("{}{}{}", color, msg, Fg(Reset));
 
 		self.print(colored_message)
 	}
