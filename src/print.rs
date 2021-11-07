@@ -1,3 +1,4 @@
+//! `print` provides utilities to facilitate printing out search results.
 use std::fmt;
 use std::io;
 use std::io::Write;
@@ -14,7 +15,7 @@ pub(crate) type Result = result::Result<(), Error>;
 /// errors. This could be done with `io::Error::kind`, but this wrapper makes it explicit it should be handled with an
 /// action such as terminating gracefully.  It's silly and annoying, but it's how it is.
 #[derive(Error, Debug)]
-pub(crate) enum Error {
+pub enum Error {
 	#[error("{0}")]
 	BrokenPipe(io::Error),
 	#[error("{0}")]
@@ -31,21 +32,21 @@ impl From<io::Error> for Error {
 }
 
 /// Printer represents an object that can perform some kind of printing, such as by the print! macro
-pub(crate) trait Printer {
+pub trait Printer {
 	/// Print the given message.
 	///
 	/// # Errors
-	/// In the event of any i/o error, an error is returned. The type [Error] gives implementors the freendom to specify
-	/// whether or not this error was due to some kind of broken pipe error, which callers may choose to execute specifc
-	/// behavior. The docs of [Error] specify more information about this.
+	/// In the event of any i/o error, an error is returned. The type [enum@Error] gives implementors the freedom to
+	/// specify whether or not this error was due to some kind of broken pipe error, which callers may choose to execute
+	/// specific behavior. The docs of [enum@Error] specify more information about this.
 	fn print<S: fmt::Display>(&self, msg: S) -> Result;
 
 	/// Print the given message with the given foreground color.
 	///
 	/// # Errors
-	/// In the event of any i/o error, an error is returned. The type [Error] gives implementors the freendom to specify
-	/// whether or not this error was due to some kind of broken pipe error, which callers may choose to execute specifc
-	/// behavior. The docs of [Error] specify more information about this.
+	/// In the event of any i/o error, an error is returned. The type [enum@Error] gives implementors the freedom to
+	/// specify whether or not this error was due to some kind of broken pipe error, which callers may choose to
+	/// execute specific behavior. The docs of [enum@Error] specify more information about this.
 	fn colored_print<S: fmt::Display, C: Color>(&self, color: Fg<C>, msg: S) -> Result {
 		let colored_message = format!("{}{}", color, msg);
 
@@ -53,7 +54,21 @@ pub(crate) trait Printer {
 	}
 }
 
-pub(crate) struct StdoutPrinter;
+/// `StdoutPrinter` is, quite simply, a printer that will print to stdout.
+pub struct StdoutPrinter;
+
+impl StdoutPrinter {
+	#[must_use]
+	pub fn new() -> Self {
+		Self::default()
+	}
+}
+
+impl Default for StdoutPrinter {
+	fn default() -> Self {
+		Self {}
+	}
+}
 
 impl Printer for StdoutPrinter {
 	fn print<S: fmt::Display>(&self, msg: S) -> Result {

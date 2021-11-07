@@ -1,3 +1,4 @@
+//! `sink` provides utilities to handle the search results provided by `grep`.
 use crate::print;
 use crate::print::{Printer, StdoutPrinter};
 use grep::searcher::{Searcher, Sink, SinkContext, SinkError, SinkMatch};
@@ -13,7 +14,7 @@ pub(crate) struct ContextPrintingSink<P: Printer> {
 	printer: P,
 }
 
-/// Error represents an error that hapens during the search process
+/// Error represents an error that happens during the search process
 ///
 /// The `SearchError` variant is specifically used to represent errors reported by the internal grep library, and
 /// their reasons may not be specifically matchable as a result.
@@ -55,9 +56,10 @@ impl<P: Printer> ContextPrintingSink<P> {
 	}
 }
 
-impl ContextPrintingSink<StdoutPrinter> {
-	pub fn new() -> Self {
-		ContextPrintingSink::default()
+impl<P: Printer> ContextPrintingSink<P> {
+	#[must_use]
+	pub fn new(printer: P) -> Self {
+		ContextPrintingSink { printer }
 	}
 }
 

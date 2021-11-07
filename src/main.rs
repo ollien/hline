@@ -1,25 +1,45 @@
+#![warn(clippy::all, clippy::pedantic)]
 use std::convert::TryFrom;
 use std::env;
 use std::fs::File;
-use std::io::Read;
+use std::io;
+use std::io::{Read, Stdin};
 use std::process;
 use thiserror::Error;
 
-// PassedFile represents some kind of file that will be passed in an argument
+/// `PassedFile` represents some kind of file that will be passed in an argument
 enum PassedFile {
     Stdin,
     Path(String),
 }
 
+/// `OpenedFile` represents some kind of file that was opened for further handling by `hl`
+enum OpenedFile {
+    Stdin(Stdin),
+    File(File),
+}
+
+/// `Args` represents arguments passed to the program
 struct Args {
     pattern: String,
     file: PassedFile,
 }
 
+/// `ArgsError` represents an error encountered while passing [Args]
 #[derive(Error, Debug)]
 enum ArgsError {
     #[error("wrong number of arguments")]
     WrongNumber,
+}
+
+impl Read for OpenedFile {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            // TODO: If more variants are ever added this could probably be a macro
+            Self::Stdin(read) => read.read(buf),
+            Self::File(read) => read.read(buf),
+        }
+    }
 }
 
 impl TryFrom<env::Args> for Args {
@@ -58,24 +78,24 @@ fn main() {
     }
 
     let mut opened_file = open_file_result.unwrap();
-    let scan_result = hl::scan_pattern(&mut *opened_file, &args.pattern);
+    let scan_result = hl::scan_pattern(&mut opened_file, &args.pattern);
     if let Err(err) = scan_result {
         eprintln!("Failed to open scan file: {}", err);
         process::exit(3);
     }
 }
 
-fn open_file(file: PassedFile) -> Result<Box<dyn Read>, std::io::Error> {
+fn open_file(file: PassedFile) -> Result<OpenedFile, std::io::Error> {
     match file {
-        PassedFile::Stdin => Ok(Box::new(std::io::stdin())),
+        PassedFile::Stdin => Ok(OpenedFile::Stdin(std::io::stdin())),
         PassedFile::Path(path) => {
-            let boxed_file = File::open(path).map(Box::new)?;
-            Ok(boxed_file)
+            let file = File::open(path)?;
+            Ok(OpenedFile::File(file))
         }
     }
 }
 
 fn print_usage() {
     let program_name = env::args().next().unwrap_or_else(|| "hl".to_string());
-    eprintln!("Usage: {} pattern [file]", program_name)
+    eprintln!("Usage: {} pattern [file]", program_name);
 }
