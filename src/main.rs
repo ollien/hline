@@ -36,7 +36,7 @@ impl TryFrom<env::Args> for Args {
 
         let file = program_args
             .next()
-            .map_or_else(|| PassedFile::Stdin, |filename| PassedFile::Path(filename));
+            .map_or_else(|| PassedFile::Stdin, PassedFile::Path);
 
         Ok(Args { pattern, file })
     }
@@ -44,7 +44,7 @@ impl TryFrom<env::Args> for Args {
 
 fn main() {
     let args_parse_result = Args::try_from(env::args());
-    if let Err(_) = args_parse_result {
+    if let Err(ArgsError::WrongNumber) = args_parse_result {
         print_usage();
         process::exit(1);
     }
@@ -68,13 +68,13 @@ fn open_file(file: PassedFile) -> Result<Box<dyn Read>, std::io::Error> {
     match file {
         PassedFile::Stdin => Ok(Box::new(std::io::stdin())),
         PassedFile::Path(path) => {
-            let boxed_file = File::open(path).map(|opened_file| Box::new(opened_file))?;
+            let boxed_file = File::open(path).map(Box::new)?;
             Ok(boxed_file)
         }
     }
 }
 
 fn print_usage() {
-    let program_name = env::args().next().unwrap_or("hl".to_string());
+    let program_name = env::args().next().unwrap_or_else(|| "hl".to_string());
     eprintln!("Usage: {} pattern [file]", program_name)
 }
