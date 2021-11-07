@@ -24,6 +24,7 @@ enum ArgsError {
 
 impl TryFrom<env::Args> for Args {
     type Error = ArgsError;
+
     fn try_from(args: env::Args) -> Result<Self, Self::Error> {
         let mut program_args = args.skip(1);
         let pattern = {

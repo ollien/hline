@@ -1,21 +1,30 @@
 use crate::print;
 use crate::print::{Printer, StdoutPrinter};
-use grep::searcher::{Searcher, Sink, SinkContext, SinkMatch};
-use std::error;
+use grep::searcher::{Searcher, Sink, SinkContext, SinkError, SinkMatch};
+use std::fmt::Display;
 use std::io;
+use std::panic;
 use termion::color;
 use thiserror::Error;
+
+const PASSTHRU_PANIC_MSG: &str = "passthru is not enabled on the given searcher";
 
 pub(crate) struct ContextPrintingSink<P: Printer> {
 	printer: P,
 }
 
+/// Error represents an error that hapens during the search process
+///
+/// The `SearchError` variant is specifically used to represent errors reported by the internal grep library, and
+/// their reasons may not be specifically matchable as a result.
 #[derive(Error, Debug)]
-enum Error {
-	#[error("The given searcher does not have passthru enabled. This is required for proper functionality")]
-	NoPassthruOnSearcher,
+pub enum Error {
 	#[error("Print failure: {0}")]
 	PrintFailed(io::Error),
+	// This error is a bit custom, and is intended to be produced by callers on the SinkError trait. As such,
+	// the message is just a passthrough
+	#[error("{0}")]
+	SearchError(String),
 }
 
 impl From<print::Error> for Error {
@@ -28,12 +37,16 @@ impl From<print::Error> for Error {
 	}
 }
 
+impl SinkError for Error {
+	fn error_message<T: Display>(message: T) -> Self {
+		Error::SearchError(message.to_string())
+	}
+}
+
 impl<P: Printer> ContextPrintingSink<P> {
-	// TODO: this box should really just return an Error.
-	fn get_sink_result_for_print_result(res: print::Result) -> Result<bool, Box<dyn error::Error>> {
+	fn get_sink_result_for_print_result(res: print::Result) -> Result<bool, Error> {
 		match res {
-			// TODO: get rid of this boxing
-			Err(print::Error::Other(_)) => Err(Box::new(Error::from(res.unwrap_err()))),
+			Err(print::Error::Other(_)) => Err(Error::from(res.unwrap_err())),
 			// It is not an error case to have a broken pipe; it just means we can't output anything more and we
 			// shouldn't keep searching
 			Err(print::Error::BrokenPipe(_)) => Ok(false),
@@ -57,25 +70,23 @@ impl Default for ContextPrintingSink<StdoutPrinter> {
 }
 
 impl<P: Printer> ContextPrintingSink<P> {
-	fn validate_searcher(searcher: &Searcher) -> Result<(), Error> {
+	fn validate_searcher(searcher: &Searcher) {
 		if !searcher.passthru() {
-			return Err(Error::NoPassthruOnSearcher);
+			// We cannot operate normally if this happens
+			panic!("{}", PASSTHRU_PANIC_MSG)
 		}
-
-		Ok(())
 	}
 }
 
 impl<P: Printer> Sink for ContextPrintingSink<P> {
-	// TODO: I may eventually reconfigure this to wrap this with an enum to differentiate improper configuration
-	type Error = Box<dyn error::Error>;
+	type Error = Error;
 
 	fn matched(
 		&mut self,
 		searcher: &Searcher,
 		sink_match: &SinkMatch,
 	) -> Result<bool, Self::Error> {
-		Self::validate_searcher(searcher)?;
+		Self::validate_searcher(searcher);
 
 		let print_res = self.printer.colored_print(
 			color::Fg(color::Red),
@@ -90,7 +101,7 @@ impl<P: Printer> Sink for ContextPrintingSink<P> {
 		searcher: &Searcher,
 		context: &SinkContext<'_>,
 	) -> Result<bool, Self::Error> {
-		Self::validate_searcher(searcher)?;
+		Self::validate_searcher(searcher);
 
 		let data = std::str::from_utf8(context.bytes()).unwrap();
 		let print_res = self.printer.print(data);
@@ -259,27 +270,38 @@ mod tests {
 		settings: &[RequiredSearcherSettings],
 		valid: bool,
 	) {
-		let matcher = RegexMatcher::new("Integer").expect("regexp doesn't compile");
+		// This must be wrapped so we can safely use `panic::catch_unwind`
+		let perform_search = || {
+			let matcher = RegexMatcher::new("Integer").expect("regexp doesn't compile");
 
-		let mock_printer = MockPrinter::default();
-		let sink = ContextPrintingSink {
-			printer: &mock_printer,
+			let mock_printer = MockPrinter::default();
+			let sink = ContextPrintingSink {
+				printer: &mock_printer,
+			};
+
+			let mut builder = SearcherBuilder::new();
+			for setting in settings {
+				match setting {
+					RequiredSearcherSettings::Passthru => builder.passthru(true),
+				};
+			}
+
+			let mut searcher = builder.build();
+			searcher.search_slice(matcher, LIPSUM.as_bytes(), sink)
 		};
 
-		let mut builder = SearcherBuilder::new();
-		for setting in settings {
-			match setting {
-				RequiredSearcherSettings::Passthru => builder.passthru(true),
-			};
-		}
-
-		let mut searcher = builder.build();
-		let search_res = searcher.search_slice(matcher, LIPSUM.as_bytes(), sink);
-
 		if valid {
+			let search_res = perform_search();
 			assert!(search_res.is_ok());
 		} else {
+			let search_res = panic::catch_unwind(perform_search);
 			assert!(search_res.is_err());
+			// This is a bit brittle, but because we must perform the wrap above to safely catch the panic, it's
+			// our best option
+			match search_res.unwrap_err().downcast_ref::<String>() {
+				Some(err) => assert_eq!(err, PASSTHRU_PANIC_MSG),
+				None => panic!("Panicked error was not of expected type"),
+			};
 		}
 	}
 }

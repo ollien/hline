@@ -58,10 +58,7 @@ pub(crate) struct StdoutPrinter;
 impl Printer for StdoutPrinter {
 	fn print<S: fmt::Display>(&self, msg: S) -> Result {
 		let mut stdout = io::stdout();
-		match write!(stdout, "{}", msg) {
-			Err(err) => Err(Error::from(err)),
-			Ok(_) => Ok(()),
-		}
+		Ok(write!(stdout, "{}", msg)?)
 	}
 }
 
