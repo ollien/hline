@@ -1,5 +1,5 @@
 [package]
-name = "hl"
+name = "hline"
 version = "0.1.0"
 edition = "2021"
 

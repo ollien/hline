@@ -78,7 +78,7 @@ fn main() {
     }
 
     let opened_file = open_file_result.unwrap();
-    let scan_result = hl::scan_pattern(opened_file, &args.pattern);
+    let scan_result = hline::scan_pattern(opened_file, &args.pattern);
     if let Err(err) = scan_result {
         eprintln!("Failed to open scan file: {}", err);
         process::exit(3);
