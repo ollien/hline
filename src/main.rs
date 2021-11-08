@@ -8,6 +8,7 @@ use std::process;
 
 const FILENAME_ARG_NAME: &str = "filename";
 const PATTERN_ARG_NAME: &str = "pattern";
+const CASE_INSENSITIVE_ARG_NAME: &str = "case-insensitive";
 
 /// `OpenedFile` represents some kind of file that was opened for further handling by `hl`
 enum OpenedFile {
@@ -39,10 +40,17 @@ impl Read for OpenedFile {
 
 impl From<ArgMatches<'_>> for Args {
     fn from(args: ArgMatches) -> Self {
+        let case_insensitive = args.is_present(CASE_INSENSITIVE_ARG_NAME);
         let pattern = args
             .value_of(PATTERN_ARG_NAME)
-            .expect("pattern arg not found, despite parser reporting it was present")
-            .to_string();
+            .map(|pat| {
+                if case_insensitive {
+                    make_pattern_case_insensitive(pat)
+                } else {
+                    pat.to_string()
+                }
+            })
+            .expect("pattern arg not found, despite parser reporting it was present");
 
         let file = args
             .value_of(FILENAME_ARG_NAME)
@@ -94,6 +102,12 @@ fn setup_arg_parser() -> App<'static, 'static> {
                 .takes_value(true)
                 .help("The file to scan. If not specified, reads from stdin"),
         )
+        .arg(
+            Arg::with_name(CASE_INSENSITIVE_ARG_NAME)
+                .short("-i")
+                .long("--ignore-case")
+                .help("Ignore case when performing matching. If not specified, the matching is case-sensitive."),
+        )
 }
 
 /// Open the file that was passed to the command line
@@ -105,4 +119,8 @@ fn open_file(file: PassedFile) -> Result<OpenedFile, std::io::Error> {
             Ok(OpenedFile::File(file))
         }
     }
+}
+
+fn make_pattern_case_insensitive(pattern: &str) -> String {
+    format!("(?i){}", pattern)
 }
