@@ -115,151 +115,16 @@ impl<P: Printer> Sink for ContextPrintingSink<P> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::testutil::mock_print::MockPrinter;
 	use grep::regex::RegexMatcher;
 	use grep::searcher::SearcherBuilder;
-	use std::cell::RefCell;
-	use std::fmt;
-	use std::io;
 	use test_case::test_case;
 
-	#[derive(Default)]
-	struct MockPrinter {
-		messages: RefCell<Vec<String>>,
-		colored_messages: RefCell<Vec<String>>,
-		next_error: RefCell<Option<print::Error>>,
-	}
-
-	impl MockPrinter {
-		fn fail_next(&mut self, error: print::Error) {
-			self.next_error.replace(Some(error));
-		}
-	}
-
-	impl Printer for &MockPrinter {
-		fn print<S: fmt::Display>(&self, msg: S) -> print::Result {
-			self.messages.borrow_mut().push(msg.to_string());
-
-			if self.next_error.borrow().is_some() {
-				Err(self.next_error.replace(None).unwrap())
-			} else {
-				Ok(())
-			}
-		}
-
-		fn colored_print<S: fmt::Display, C: color::Color>(
-			&self,
-			_color: color::Fg<C>,
-			msg: S,
-		) -> print::Result {
-			// Unfortunately, termion colors don't implement PartialEq, so checking for the exact color is not
-			// feasible unless we wanted to write a wrapper, which I don't care enough to just for unit testing
-			self.colored_messages.borrow_mut().push(msg.to_string());
-
-			if self.next_error.borrow().is_some() {
-				Err(self.next_error.replace(None).unwrap())
-			} else {
-				Ok(())
-			}
-		}
-	}
-
-	const LIPSUM: &str = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam vel magna a magna porta \n\
-	viverra eu ac metus. Integer auctor enim id turpis mollis, quis sagittis nulla accumsan. Nam sagittis lorem ut \n\
-	elit convallis ultricies. Suspendisse sed lobortis enim. Nulla lobortis tristique maximus. Mauris fermentum urna \n\
-	id ex finibus commodo. Aliquam erat volutpat. Maecenas tristique erat vel consectetur varius. Fusce a \n\
-	condimentum orci. Praesent at rhoncus felis, et tempus nulla. Morbi consectetur, elit quis interdum tincidunt, \n\
-	felis risus malesuada elit, non feugiat tortor velit vel risus. Nullam a odio sodales, iaculis quam sit amet, \n\
-	molestie dolor.  Praesent et nibh id nisl convallis hendrerit ac sed sapien. Fusce tempus venenatis odio, \n\
-	ut maximus nisi egestas vel.";
-
-	fn are_slices_eq<T: PartialEq>(v1: &[T], v2: &[T]) -> bool {
-		if v1.len() != v2.len() {
-			return false;
-		}
-
-		// https://stackoverflow.com/a/29504547
-		let len = v1.len();
-		v1.iter().zip(v2).filter(|&(a, b)| a == b).count() == len
-	}
-
-	#[test]
-	fn test_highlights_matches() {
-		let matcher = RegexMatcher::new("Integer").expect("regexp doesn't compile");
-
-		let mock_printer = MockPrinter::default();
-		let sink = ContextPrintingSink {
-			printer: &mock_printer,
-		};
-
-		let res = SearcherBuilder::new().passthru(true).build().search_slice(
-			matcher,
-			LIPSUM.as_bytes(),
-			sink,
-		);
-		if let Err(err) = res {
-			panic!("failed to search: {}", err)
-		}
-
-		let colored_messages = mock_printer.colored_messages.borrow();
-		let expected_colored_messages = ["viverra eu ac metus. Integer auctor enim id turpis mollis, quis sagittis nulla accumsan. Nam sagittis lorem ut \n".to_string()];
-		assert!(
-			are_slices_eq(&colored_messages, &expected_colored_messages),
-			"(expected) {:?} != (actual) {:?}",
-			expected_colored_messages,
-			colored_messages,
-		);
-
-		let uncolored_messages = mock_printer.messages.borrow();
-		let expected_uncolored_messages = [
-			"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam vel magna a magna porta \n".to_string(),
-			// only missing the line that's in expected
-			"elit convallis ultricies. Suspendisse sed lobortis enim. Nulla lobortis tristique maximus. Mauris fermentum urna \n".to_string(),
-			"id ex finibus commodo. Aliquam erat volutpat. Maecenas tristique erat vel consectetur varius. Fusce a \n".to_string(),
-			"condimentum orci. Praesent at rhoncus felis, et tempus nulla. Morbi consectetur, elit quis interdum tincidunt, \n".to_string(),
-			"felis risus malesuada elit, non feugiat tortor velit vel risus. Nullam a odio sodales, iaculis quam sit amet, \n".to_string(),
-			"molestie dolor.  Praesent et nibh id nisl convallis hendrerit ac sed sapien. Fusce tempus venenatis odio, \n".to_string(),
-			"ut maximus nisi egestas vel.".to_string()
-		];
-		assert!(
-			are_slices_eq(&uncolored_messages, &expected_uncolored_messages),
-			"(expected) {:?} != (actual) {:?}",
-			expected_uncolored_messages,
-			colored_messages,
-		);
-	}
-
-	#[test_case(".", 0, 1; "failure on first match will only attempt to print that match")]
-	#[test_case("this doesn't appear in lorem ipsum", 1, 0; "never matching will only attempt to print the first line")]
-	fn test_does_not_attempt_to_print_after_broken_pipe_error(
-		pattern: &str,
-		num_uncolored_messages: usize,
-		num_colored_messages: usize,
-	) {
-		let matcher = RegexMatcher::new(pattern).expect("regexp doesn't compile");
-
-		let mut mock_printer = MockPrinter::default();
-
-		let broken_pipe_err =
-			print::Error::from(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"));
-		mock_printer.fail_next(broken_pipe_err);
-
-		let sink = ContextPrintingSink {
-			printer: &mock_printer,
-		};
-
-		let res = SearcherBuilder::new().passthru(true).build().search_slice(
-			matcher,
-			LIPSUM.as_bytes(),
-			sink,
-		);
-
-		assert!(!res.is_err(), "failed to search: {:?}", res.unwrap_err());
-		assert_eq!(
-			num_colored_messages,
-			mock_printer.colored_messages.borrow().len()
-		);
-		assert_eq!(num_uncolored_messages, mock_printer.messages.borrow().len());
-	}
+	const SEARCH_TEXT: &str = "The quick \n\
+		brown fox \n\
+		jumped over \n\
+		the lazy \n\
+		dog.";
 
 	// TODO: This is a bit overkill for a single setting, and could probably be simplified
 	enum RequiredSearcherSettings {
@@ -274,7 +139,7 @@ mod tests {
 	) {
 		// This must be wrapped so we can safely use `panic::catch_unwind`
 		let perform_search = || {
-			let matcher = RegexMatcher::new("Integer").expect("regexp doesn't compile");
+			let matcher = RegexMatcher::new("fox").expect("regexp doesn't compile");
 
 			let mock_printer = MockPrinter::default();
 			let sink = ContextPrintingSink {
@@ -289,7 +154,7 @@ mod tests {
 			}
 
 			let mut searcher = builder.build();
-			searcher.search_slice(matcher, LIPSUM.as_bytes(), sink)
+			searcher.search_slice(matcher, SEARCH_TEXT.as_bytes(), sink)
 		};
 
 		if valid {
