@@ -1,17 +1,13 @@
 #![warn(clippy::all, clippy::pedantic)]
-use std::convert::TryFrom;
+use clap::{crate_name, crate_version, App, AppSettings, Arg, ArgMatches};
 use std::env;
 use std::fs::File;
 use std::io;
 use std::io::{Read, Stdin};
 use std::process;
-use thiserror::Error;
 
-/// `PassedFile` represents some kind of file that will be passed in an argument
-enum PassedFile {
-    Stdin,
-    Path(String),
-}
+const FILENAME_ARG_NAME: &str = "filename";
+const PATTERN_ARG_NAME: &str = "pattern";
 
 /// `OpenedFile` represents some kind of file that was opened for further handling by `hl`
 enum OpenedFile {
@@ -19,17 +15,16 @@ enum OpenedFile {
     File(File),
 }
 
+/// `PassedFile` represents some kind of file that will be passed in an argument
+enum PassedFile {
+    Stdin,
+    Path(String),
+}
+
 /// `Args` represents arguments passed to the program
 struct Args {
     pattern: String,
     file: PassedFile,
-}
-
-/// `ArgsError` represents an error encountered while passing [Args]
-#[derive(Error, Debug)]
-enum ArgsError {
-    #[error("wrong number of arguments")]
-    WrongNumber,
 }
 
 impl Read for OpenedFile {
@@ -42,33 +37,26 @@ impl Read for OpenedFile {
     }
 }
 
-impl TryFrom<env::Args> for Args {
-    type Error = ArgsError;
+impl From<ArgMatches<'_>> for Args {
+    fn from(args: ArgMatches) -> Self {
+        let pattern = args
+            .value_of(PATTERN_ARG_NAME)
+            .expect("pattern arg not found, despite parser reporting it was present")
+            .to_string();
 
-    fn try_from(args: env::Args) -> Result<Self, Self::Error> {
-        let mut program_args = args.skip(1);
-        let pattern = {
-            if let Some(pattern) = program_args.next() {
-                pattern
-            } else {
-                return Err(ArgsError::WrongNumber);
-            }
-        };
+        let file = args
+            .value_of(FILENAME_ARG_NAME)
+            .map_or(PassedFile::Stdin, |filename| {
+                PassedFile::Path(filename.to_string())
+            });
 
-        let file = program_args
-            .next()
-            .map_or_else(|| PassedFile::Stdin, PassedFile::Path);
-
-        Ok(Args { pattern, file })
+        Args { pattern, file }
     }
 }
 
 fn main() {
-    let args_parse_result = Args::try_from(env::args());
-    if let Err(ArgsError::WrongNumber) = args_parse_result {
-        print_usage();
-        process::exit(1);
-    }
+    let parsed_args = setup_arg_parser().get_matches();
+    let args_parse_result = Args::try_from(parsed_args);
 
     let args = args_parse_result.unwrap();
     let open_file_result = open_file(args.file);
@@ -85,6 +73,30 @@ fn main() {
     }
 }
 
+/// Setup the argument parser for the program with all possible flags
+fn setup_arg_parser() -> App<'static, 'static> {
+    App::new(crate_name!())
+        .version(crate_version!())
+        .about("Highlights lines that match the given regular expression")
+        .setting(AppSettings::DisableVersion)
+        .arg(
+            Arg::with_name("pattern")
+                .takes_value(true)
+                .required(true)
+                .allow_hyphen_values(true)
+                .help(concat!(
+                    "The regular expression to search for. Note that this is not anchored, and if ",
+                    "anchoring is desired, should be done manually with ^ or $."
+                )),
+        )
+        .arg(
+            Arg::with_name(FILENAME_ARG_NAME)
+                .takes_value(true)
+                .help("The file to scan. If not specified, reads from stdin"),
+        )
+}
+
+/// Open the file that was passed to the command line
 fn open_file(file: PassedFile) -> Result<OpenedFile, std::io::Error> {
     match file {
         PassedFile::Stdin => Ok(OpenedFile::Stdin(std::io::stdin())),
@@ -93,9 +105,4 @@ fn open_file(file: PassedFile) -> Result<OpenedFile, std::io::Error> {
             Ok(OpenedFile::File(file))
         }
     }
-}
-
-fn print_usage() {
-    let program_name = env::args().next().unwrap_or_else(|| "hl".to_string());
-    eprintln!("Usage: {} pattern [file]", program_name);
 }

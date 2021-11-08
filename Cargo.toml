@@ -9,6 +9,7 @@ edition = "2021"
 grep = "0.2"
 thiserror = "1"
 termion = "1"
+clap = "2.33"
 
 [dev-dependencies]
 test-case = "1.2.1"
