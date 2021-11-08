@@ -83,15 +83,15 @@ mod tests {
     use test_case::test_case;
 
     #[test_case(
-		io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"),
-		&|err| matches!(err, Error::BrokenPipe(_));
-		"BrokenPipe results in BrokenPipe variant"
-	)]
+        io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"),
+        &|err| matches!(err, Error::BrokenPipe(_));
+        "BrokenPipe results in BrokenPipe variant"
+    )]
     #[test_case(
-		io::Error::new(io::ErrorKind::Interrupted, "can't print, we're busy"),
-		&|err| matches!(err, Error::Other(_));
-		"non-BrokenPipe produces Other variant"
-	)]
+        io::Error::new(io::ErrorKind::Interrupted, "can't print, we're busy"),
+        &|err| matches!(err, Error::Other(_));
+        "non-BrokenPipe produces Other variant"
+    )]
     fn test_error_from_io_err(from: io::Error, matches: &dyn Fn(&Error) -> bool) {
         let produced_err = Error::from(from);
         assert!(

@@ -121,10 +121,10 @@ mod tests {
     use test_case::test_case;
 
     const SEARCH_TEXT: &str = "The quick \n\
-		brown fox \n\
-		jumped over \n\
-		the lazy \n\
-		dog.";
+    brown fox \n\
+    jumped over \n\
+    the lazy \n\
+    dog.";
 
     // TODO: This is a bit overkill for a single setting, and could probably be simplified
     enum RequiredSearcherSettings {
