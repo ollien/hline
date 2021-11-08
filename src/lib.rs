@@ -46,7 +46,7 @@ impl From<regex::Error> for Error {
 /// # Errors
 ///
 /// See `scan_pattern_to_printer`
-pub fn scan_pattern<R: Read>(reader: &mut R, pattern: &str) -> Result<(), Error> {
+pub fn scan_pattern<R: Read>(reader: R, pattern: &str) -> Result<(), Error> {
 	scan_pattern_to_printer(reader, pattern, StdoutPrinter::new())
 }
 
@@ -63,7 +63,7 @@ pub fn scan_pattern<R: Read>(reader: &mut R, pattern: &str) -> Result<(), Error>
 /// - I/O errors in scanning from the `Read`
 /// - An error produced by the underlying grep library during the search
 pub fn scan_pattern_to_printer<R: Read, P: Printer>(
-	reader: &mut R,
+	reader: R,
 	pattern: &str,
 	printer: P,
 ) -> Result<(), Error> {
