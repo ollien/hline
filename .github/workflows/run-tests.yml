@@ -1,0 +1,11 @@
+on: [push, pull_request]
+jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - run: cargo test
