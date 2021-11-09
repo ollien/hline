@@ -7,6 +7,7 @@ use std::io;
 use std::io::Read;
 use thiserror::Error;
 
+mod lines;
 pub mod print;
 mod sink;
 

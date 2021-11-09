@@ -7,7 +7,7 @@ use termion::color;
 
 #[derive(Default)]
 pub(crate) struct MockPrinter {
-    pub(crate) messages: RefCell<Vec<String>>,
+    pub(crate) uncolored_messages: RefCell<Vec<String>>,
     pub(crate) colored_messages: RefCell<Vec<String>>,
     next_error: RefCell<Option<print::Error>>,
 }
@@ -20,7 +20,7 @@ impl MockPrinter {
 
 impl Printer for &MockPrinter {
     fn print<S: fmt::Display>(&self, msg: S) -> print::Result {
-        self.messages.borrow_mut().push(msg.to_string());
+        self.uncolored_messages.borrow_mut().push(msg.to_string());
 
         if self.next_error.borrow().is_some() {
             Err(self.next_error.replace(None).unwrap())
@@ -43,5 +43,18 @@ impl Printer for &MockPrinter {
         } else {
             Ok(())
         }
+    }
+}
+
+/// Similar to `MockPrinter`, except that it only implements required methods
+#[derive(Default)]
+pub(crate) struct BarebonesMockPrinter {
+    pub(crate) messages: RefCell<Vec<String>>,
+}
+
+impl Printer for BarebonesMockPrinter {
+    fn print<S: fmt::Display>(&self, msg: S) -> print::Result {
+        self.messages.borrow_mut().push(msg.to_string());
+        Ok(())
     }
 }

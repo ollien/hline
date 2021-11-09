@@ -1,4 +1,5 @@
 //! `print` provides utilities to facilitate printing out search results.
+use crate::lines;
 use std::fmt;
 use std::io;
 use std::io::Write;
@@ -48,9 +49,24 @@ pub trait Printer {
     /// specify whether or not this error was due to some kind of broken pipe error, which callers may choose to
     /// execute specific behavior. The docs of [enum@Error] specify more information about this.
     fn colored_print<S: fmt::Display, C: Color>(&self, color: Fg<C>, msg: S) -> Result {
-        let colored_message = format!("{}{}{}", color, msg, Fg(Reset));
+        let msg_string = msg.to_string();
+        let colored_msg: String = lines::line_split(&msg_string)
+            .map(|(component, joining_newline)| {
+                if component.is_empty() {
+                    return joining_newline.unwrap_or_default().to_string();
+                }
 
-        self.print(colored_message)
+                format!(
+                    "{color}{component}{reset}{joining_newline}",
+                    color = color,
+                    reset = Fg(Reset),
+                    component = component,
+                    joining_newline = joining_newline.unwrap_or_default()
+                )
+            })
+            .collect();
+
+        self.print(colored_msg)
     }
 }
 
@@ -80,6 +96,9 @@ impl Printer for StdoutPrinter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testutil;
+    use crate::testutil::mock_print::BarebonesMockPrinter;
+    use termion::color::Magenta;
     use test_case::test_case;
 
     #[test_case(
@@ -99,5 +118,29 @@ mod tests {
             "enum did not match: got {:?}",
             &produced_err
         );
+    }
+
+    #[test_case(
+        "hello world".to_string(),
+        format!("{0}hello world{1}", Fg(Magenta), Fg(Reset));
+        "no-newline case ends with reset"
+    )]
+    #[test_case(
+        "foo\nbar\n".to_string(),
+        format!("{0}foo{1}\n{0}bar{1}\n", Fg(Magenta), Fg(Reset));
+        "puts reset char before newlines"
+    )]
+    #[test_case(
+        "hello\n\n\nworld".to_string(),
+        format!("{0}hello{1}\n\n\n{0}world{1}", Fg(Magenta), Fg(Reset));
+        "empty strings don't need colorization"
+    )]
+    fn test_resets_colors_properly(message: String, expected: String) {
+        // We're using a mock here specifically so we can test the default implementation of colored_print
+        let printer = BarebonesMockPrinter::default();
+        let res = printer.colored_print(Fg(Magenta), message);
+        assert!(res.is_ok(), "{}", res.unwrap_err());
+
+        testutil::assert_slices_eq!(&[expected], &printer.messages.borrow());
     }
 }
