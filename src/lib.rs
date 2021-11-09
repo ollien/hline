@@ -78,6 +78,7 @@ pub fn scan_pattern_to_printer<R: Read, P: Printer>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testutil;
     use std::io;
     use stringreader::StringReader;
     use test_case::test_case;
@@ -119,14 +120,9 @@ mod tests {
             "shortly to give an account of the relations of the computable numbers, \n".to_string(),
             "computable numbers. According to my definition, a number is computable \n".to_string(),
         ];
-        assert!(
-            testutil::are_slices_eq(&colored_messages, &expected_colored_messages),
-            "(expected) {:?} != (actual) {:?}",
-            expected_colored_messages,
-            colored_messages,
-        );
+        testutil::assert_slices_eq!(&colored_messages, &expected_colored_messages);
 
-        let uncolored_messages = mock_printer.messages.borrow();
+        let uncolored_messages = mock_printer.uncolored_messages.borrow();
         #[rustfmt::skip]
         let expected_uncolored_messages = [
             "numbers whose expressions as a decimal are calculable by finite means. \n".to_string(),
@@ -138,12 +134,7 @@ mod tests {
             "of the theory of functions of a real variable expressed in terms of \n".to_string(),
             "if its decimal can be written down by a machine.\n".to_string(),
         ];
-        assert!(
-            testutil::are_slices_eq(&uncolored_messages, &expected_uncolored_messages),
-            "(expected) {:?} != (actual) {:?}",
-            expected_uncolored_messages,
-            colored_messages,
-        );
+        testutil::assert_slices_eq!(&uncolored_messages, &expected_uncolored_messages);
     }
 
     #[test]
@@ -161,14 +152,9 @@ mod tests {
         let expected_colored_messages = [
             "of an integral variable or a real or computable variable, computable \n".to_string(),
         ];
-        assert!(
-            testutil::are_slices_eq(&colored_messages, &expected_colored_messages),
-            "(expected) {:?} != (actual) {:?}",
-            expected_colored_messages,
-            colored_messages,
-        );
+        testutil::assert_slices_eq!(&colored_messages, &expected_colored_messages);
 
-        let uncolored_messages = mock_printer.messages.borrow();
+        let uncolored_messages = mock_printer.uncolored_messages.borrow();
         // Again, the only missing message is the previous
         #[rustfmt::skip]
         let expected_uncolored_messages = [
@@ -185,12 +171,7 @@ mod tests {
             "computable numbers. According to my definition, a number is computable \n".to_string(),
             "if its decimal can be written down by a machine.\n".to_string()
         ];
-        assert!(
-            testutil::are_slices_eq(&uncolored_messages, &expected_uncolored_messages),
-            "(expected) {:?} != (actual) {:?}",
-            expected_uncolored_messages,
-            colored_messages,
-        );
+        testutil::assert_slices_eq!(&uncolored_messages, &expected_uncolored_messages);
     }
 
     #[test_case(".", 0, 1; "failure on first match will only attempt to print that match")]
@@ -212,6 +193,9 @@ mod tests {
             num_colored_messages,
             mock_printer.colored_messages.borrow().len()
         );
-        assert_eq!(num_uncolored_messages, mock_printer.messages.borrow().len());
+        assert_eq!(
+            num_uncolored_messages,
+            mock_printer.uncolored_messages.borrow().len()
+        );
     }
 }
