@@ -5,7 +5,7 @@ use grep::searcher::{Searcher, Sink, SinkContext, SinkError, SinkMatch};
 use std::fmt::Display;
 use std::io;
 use std::panic;
-use termion::color;
+use termion::color::{Fg, LightRed};
 use thiserror::Error;
 
 const PASSTHRU_PANIC_MSG: &str = "passthru is not enabled on the given searcher";
@@ -89,7 +89,7 @@ impl<P: Printer> Sink for ContextPrintingSink<P> {
         Self::validate_searcher(searcher);
 
         let print_res = self.printer.colored_print(
-            color::Fg(color::Red),
+            Fg(LightRed),
             std::str::from_utf8(sink_match.bytes()).unwrap(),
         );
 
