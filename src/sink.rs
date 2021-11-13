@@ -61,21 +61,19 @@ impl<P: Printer> ContextPrintingSink<P> {
     pub fn new(printer: P) -> Self {
         ContextPrintingSink { printer }
     }
+
+    fn validate_searcher(searcher: &Searcher) {
+        if !searcher.passthru() {
+            // We cannot operate normally if this happens
+            panic!("{}", PASSTHRU_PANIC_MSG)
+        }
+    }
 }
 
 impl Default for ContextPrintingSink<StdoutPrinter> {
     fn default() -> Self {
         ContextPrintingSink {
             printer: StdoutPrinter {},
-        }
-    }
-}
-
-impl<P: Printer> ContextPrintingSink<P> {
-    fn validate_searcher(searcher: &Searcher) {
-        if !searcher.passthru() {
-            // We cannot operate normally if this happens
-            panic!("{}", PASSTHRU_PANIC_MSG)
         }
     }
 }
