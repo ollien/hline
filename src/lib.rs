@@ -17,11 +17,11 @@ mod testutil;
 /// Error represents the possible errors that can occur during the search process. See `scan_pattern` for more details.
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("{0}")]
+    #[error("Regular expression engine failed: {0}")]
     RegexError(regex::Error),
-    #[error("Search process encountered a failure: {0}")]
+    #[error("Search process failed: {0}")]
     SearchError(String),
-    #[error("Print failure: {0}")]
+    #[error("Printing results failed: {0}")]
     PrintFailure(io::Error),
 }
 

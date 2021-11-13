@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io;
 use std::io::{Read, Stdin};
 use std::process;
+use termion::color::{Fg, LightRed, Reset};
 
 const FILENAME_ARG_NAME: &str = "filename";
 const PATTERN_ARG_NAME: &str = "pattern";
@@ -76,7 +77,13 @@ fn main() {
     let opened_file = open_file_result.unwrap();
     let scan_result = hline::scan_pattern(opened_file, &args.pattern);
     if let Err(err) = scan_result {
-        eprintln!("Failed to open scan file: {}", err);
+        // the lib crate provides the context for the errors in their error messages
+        eprintln!(
+            "{color}error:{reset} {err}",
+            color = Fg(LightRed),
+            reset = Fg(Reset),
+            err = err
+        );
         process::exit(3);
     }
 }
