@@ -5,7 +5,7 @@
 ## Usage
 
 ```
-hline 0.1.0
+hline 0.1.1
 Highlights lines that match the given regular expression
 
 USAGE:
