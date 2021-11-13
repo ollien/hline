@@ -111,13 +111,27 @@ fn setup_arg_parser() -> App<'static, 'static> {
 }
 
 /// Open the file that was passed to the command line
-fn open_file(file: PassedFile) -> Result<OpenedFile, std::io::Error> {
+fn open_file(file: PassedFile) -> Result<OpenedFile, io::Error> {
     match file {
-        PassedFile::Stdin => Ok(OpenedFile::Stdin(std::io::stdin())),
+        PassedFile::Stdin => Ok(OpenedFile::Stdin(io::stdin())),
         PassedFile::Path(path) => {
             let file = File::open(path)?;
+            assert_is_directory(&file)?;
             Ok(OpenedFile::File(file))
         }
+    }
+}
+
+fn assert_is_directory(file: &File) -> Result<(), io::Error> {
+    let metadata = file.metadata()?;
+    if metadata.is_dir() {
+        Err(io::Error::new(
+            // io::ErrorKind::IsADirectory is unstable at the time of writing :(
+            io::ErrorKind::Other,
+            "is a directory",
+        ))
+    } else {
+        Ok(())
     }
 }
 

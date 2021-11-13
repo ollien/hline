@@ -60,7 +60,7 @@ pub fn scan_pattern<R: Read>(reader: R, pattern: &str) -> Result<(), Error> {
 /// # Errors
 ///
 /// There are three general error cases
-/// - An invalid reuglar expression
+/// - An invalid regular expression
 /// - I/O errors in scanning from the `Read`
 /// - An error produced by the underlying grep library during the search
 pub fn scan_pattern_to_printer<R: Read, P: Printer>(
