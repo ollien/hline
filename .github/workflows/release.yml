@@ -12,6 +12,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - uses: katyo/publish-crates@v1
+      - uses: katyo/publish-crates@5cb50445e250bfeb7f823f4785be2de044f4ba7a
         with:
           registry-token: ${{ secrets.CARGO_TOKEN }}
