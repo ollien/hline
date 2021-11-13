@@ -20,3 +20,5 @@ ARGS:
                   should be done manually with ^ or $.
     <filename>    The file to scan. If not specified, reads from stdin
 ```
+
+### [Changelog](CHANGELOG.md)
