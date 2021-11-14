@@ -14,18 +14,26 @@ pub(crate) struct ContextPrintingSink<P: Printer> {
     printer: P,
 }
 
-/// Error represents an error that happens during the search process
+/// `Error` represents an error that happens during the search process
 ///
-/// The `SearchError` variant is specifically used to represent errors reported by the internal grep library, and
-/// their reasons may not be specifically matchable as a result.
 #[derive(Error, Debug)]
 pub enum Error {
+    /// Printing to the given printer failed due to an i/o error.
     #[error("Print failure: {0}")]
-    PrintFailed(io::Error),
+    PrintFailed(
+        /// The original i/o error that caused the print failure.
+        io::Error,
+    ),
+
+    /// The `SearchError` variant is specifically used to represent errors reported by the internal grep library, and
+    /// their reasons may not be specifically matchable as a result.
     // This error is a bit custom, and is intended to be produced by callers on the SinkError trait. As such,
     // the message is just a passthrough
     #[error("{0}")]
-    SearchError(String),
+    SearchError(
+        /// An error message provided by the underlying grep library.
+        String,
+    ),
 }
 
 impl From<print::Error> for Error {

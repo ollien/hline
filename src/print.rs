@@ -9,7 +9,7 @@ use thiserror::Error;
 
 pub(crate) type Result = result::Result<(), Error>;
 
-/// Error is a simple wrapper for `io::Error` that differentiates between certain error kinds as part of the type.
+/// Error is a simple wrapper for [`io::Error`] that differentiates between certain error kinds as part of the type.
 ///
 /// In general, this type exists because of <https://github.com/rust-lang/rust/issues/46016>; println! panics on
 /// broken pipe errors. Though we could just ignore the errors, we need some way to differentiate between it and other
@@ -32,7 +32,7 @@ impl From<io::Error> for Error {
     }
 }
 
-/// Printer represents an object that can perform some kind of printing, such as by the print! macro
+/// `Printer` represents an object that can perform some kind of printing, such as by the print! macro
 pub trait Printer {
     /// Print the given message.
     ///

@@ -14,15 +14,27 @@ mod sink;
 #[cfg(test)]
 mod testutil;
 
-/// Error represents the possible errors that can occur during the search process. See `scan_pattern` for more details.
+/// `Error` represents the possible errors that can occur during the search process.
 #[derive(Error, Debug)]
 pub enum Error {
+    /// Parsing the given regular expression failed.
     #[error("Regular expression engine failed: {0}")]
-    RegexError(regex::Error),
+    RegexError(
+        /// The original i/o error that caused the print failure.
+        regex::Error,
+    ),
+    /// The search process encountered a fatal error. This is likely an i/o error, but it is not necessarily.
     #[error("Search process failed: {0}")]
-    SearchError(String),
+    SearchError(
+        /// An error message provided by the underlying grep library.
+        String,
+    ),
+    /// Printing to the given printer failed due to an i/o error. The original error is wrapped in the variant
     #[error("Printing results failed: {0}")]
-    PrintFailure(io::Error),
+    PrintFailure(
+        /// The original i/o error that caused the print failure.
+        io::Error,
+    ),
 }
 
 impl From<sink::Error> for Error {
@@ -42,11 +54,11 @@ impl From<regex::Error> for Error {
 
 /// `scan_pattern` will print a reader's contents, while also scanning its contents for a regular expression.
 /// Lines that match this pattern will be highlighted in the output.
-/// A convenience wrapper for `scan_pattern_to_printer` that will print to stdout.
+/// A convenience wrapper for [`scan_pattern_to_printer`] that will print to stdout.
 ///
 /// # Errors
 ///
-/// See `scan_pattern_to_printer`
+/// See [`scan_pattern_to_printer`]
 pub fn scan_pattern<R: Read>(reader: R, pattern: &str) -> Result<(), Error> {
     scan_pattern_to_printer(reader, pattern, StdoutPrinter::new())
 }
@@ -59,10 +71,14 @@ pub fn scan_pattern<R: Read>(reader: R, pattern: &str) -> Result<(), Error> {
 ///
 /// # Errors
 ///
-/// There are three general error cases
+/// There are four general error cases
 /// - An invalid regular expression
-/// - I/O errors in scanning from the `Read`
 /// - An error produced by the underlying grep library during the search
+/// - I/O errors in scanning from the [`Read`] (these will be manifested as search errors, as the search process is what
+///   performs the reading).
+/// - A failure to print to the given printer
+///
+/// See [enum@Error] for more details.
 pub fn scan_pattern_to_printer<R: Read, P: Printer>(
     reader: R,
     pattern: &str,

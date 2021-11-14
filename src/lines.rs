@@ -1,6 +1,6 @@
 //! `lines` provides utilities for processing lines of strings
 
-/// `line_split` is an extremely similar iterator to `str::lines`, but with one key difference: it provides the line
+/// `line_split` is an extremely similar iterator to [`str::lines`], but with one key difference: it provides the line
 /// character type it split on (the second element in the returned tuple). This way, one can reconstruct the original
 /// string when joining. If the line was not terminated by a newline (i.e. when it's at the end of a file), the second
 /// tuple element will be None.

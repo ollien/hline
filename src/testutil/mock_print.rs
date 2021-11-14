@@ -46,7 +46,7 @@ impl Printer for &MockPrinter {
     }
 }
 
-/// Similar to `MockPrinter`, except that it only implements required methods
+/// Similar to [`MockPrinter`], except that it only implements required methods
 #[derive(Default)]
 pub(crate) struct BarebonesMockPrinter {
     pub(crate) messages: RefCell<Vec<String>>,
