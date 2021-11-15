@@ -16,4 +16,3 @@ clap = "2.33"
 
 [dev-dependencies]
 test-case = "1.2.1"
-stringreader = "0.1"

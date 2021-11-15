@@ -1,15 +1,18 @@
 #![warn(clippy::all, clippy::pedantic)]
 use clap::{crate_name, crate_version, App, AppSettings, Arg, ArgMatches};
+use hline::file;
 use std::env;
+use std::fmt::Display;
 use std::fs::File;
 use std::io;
-use std::io::{Read, Stdin};
+use std::io::{Read, Seek, Stdin};
 use std::process;
 use termion::color::{Fg, LightRed, Reset};
 
 const FILENAME_ARG_NAME: &str = "filename";
 const PATTERN_ARG_NAME: &str = "pattern";
 const CASE_INSENSITIVE_ARG_NAME: &str = "case-insensitive";
+const OK_IF_BINARY_ARG_NAME: &str = "ok-if-binary";
 
 /// `OpenedFile` represents some kind of file that was opened for further handling by `hl`
 enum OpenedFile {
@@ -27,6 +30,7 @@ enum PassedFile {
 struct Args {
     pattern: String,
     file: PassedFile,
+    ok_if_binary_file: bool,
 }
 
 impl Read for OpenedFile {
@@ -42,6 +46,7 @@ impl Read for OpenedFile {
 impl From<ArgMatches<'_>> for Args {
     fn from(args: ArgMatches) -> Self {
         let case_insensitive = args.is_present(CASE_INSENSITIVE_ARG_NAME);
+        let ok_if_binary_file = args.is_present(OK_IF_BINARY_ARG_NAME);
         let pattern = args
             .value_of(PATTERN_ARG_NAME)
             .map(|pat| {
@@ -59,7 +64,11 @@ impl From<ArgMatches<'_>> for Args {
                 PassedFile::Path(filename.to_string())
             });
 
-        Args { pattern, file }
+        Args {
+            pattern,
+            file,
+            ok_if_binary_file,
+        }
     }
 }
 
@@ -70,22 +79,30 @@ fn main() {
     let args = args_parse_result.unwrap();
     let open_file_result = open_file(args.file);
     if let Err(err) = open_file_result {
-        eprintln!("Failed to open input file: {}", err);
+        print_error(format!("Failed to open input file: {}", err));
         process::exit(2);
     }
 
-    let opened_file = open_file_result.unwrap();
+    let mut opened_file = open_file_result.unwrap();
+    if !args.ok_if_binary_file {
+        handle_potentially_binary_file(&mut opened_file);
+    }
+
     let scan_result = hline::scan_pattern(opened_file, &args.pattern);
     if let Err(err) = scan_result {
         // the lib crate provides the context for the errors in their error messages
-        eprintln!(
-            "{color}error:{reset} {err}",
-            color = Fg(LightRed),
-            reset = Fg(Reset),
-            err = err
-        );
+        print_error(err);
         process::exit(3);
     }
+}
+
+fn print_error<T: Display>(error_msg: T) {
+    eprintln!(
+        "{color}error:{reset} {err}",
+        color = Fg(LightRed),
+        reset = Fg(Reset),
+        err = error_msg
+    );
 }
 
 /// Setup the argument parser for the program with all possible flags
@@ -114,6 +131,11 @@ fn setup_arg_parser() -> App<'static, 'static> {
                 .short("-i")
                 .long("--ignore-case")
                 .help("Ignore case when performing matching. If not specified, the matching is case-sensitive."),
+        )
+        .arg(
+            Arg::with_name(OK_IF_BINARY_ARG_NAME)
+                .short("-b")
+                .help("Treat the given input file as text, even if it may be a binary file"),
         )
 }
 
@@ -144,4 +166,34 @@ fn assert_is_directory(file: &File) -> Result<(), io::Error> {
 
 fn make_pattern_case_insensitive(pattern: &str) -> String {
     format!("(?i){}", pattern)
+}
+
+/// Check if the given file is a binary file, and if it is, exit gracefully
+fn handle_potentially_binary_file(opened_file: &mut OpenedFile) {
+    let is_binary_file = match should_treat_as_binary_file(opened_file) {
+        Err(err) => {
+            // This could probably be done nicer with a macro but I don't care about a small allocation like this
+            // when we're immediately about to quit anyway
+            print_error(format!("failed to peek file: {}", err));
+            process::exit(4);
+        }
+        Ok(val) => val,
+    };
+
+    if is_binary_file {
+        print_error("Input file may be a binary file. Pass -b to ignore this and scan anyway.");
+        process::exit(5);
+    }
+}
+
+// Check if a given file is a binary file (or not possible to be easily checked)
+fn should_treat_as_binary_file(opened_file: &mut OpenedFile) -> Result<bool, io::Error> {
+    match opened_file {
+        OpenedFile::Stdin(_) => Ok(false),
+        OpenedFile::File(file) => {
+            let is_likely_utf8 = file::is_file_likely_utf8(file)?;
+            file.rewind()?;
+            Ok(!is_likely_utf8)
+        }
+    }
 }

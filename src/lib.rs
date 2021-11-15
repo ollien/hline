@@ -7,6 +7,7 @@ use std::io;
 use std::io::Read;
 use thiserror::Error;
 
+pub mod file;
 mod lines;
 pub mod print;
 mod sink;
@@ -97,7 +98,7 @@ mod tests {
     use super::*;
     use crate::testutil;
     use std::io;
-    use stringreader::StringReader;
+    use std::io::Cursor;
     use test_case::test_case;
     use testutil::mock_print::MockPrinter;
 
@@ -118,7 +119,7 @@ mod tests {
     #[test]
     fn test_highlights_matches() {
         let mock_printer = MockPrinter::default();
-        let mut lipsum_reader = StringReader::new(SEARCH_TEXT);
+        let mut lipsum_reader = Cursor::new(SEARCH_TEXT);
         let res = scan_pattern_to_printer(
             &mut lipsum_reader,
             r#""?computable"?\snumbers"#,
@@ -157,7 +158,7 @@ mod tests {
     #[test]
     fn case_insensitive_pattern_matches() {
         let mock_printer = MockPrinter::default();
-        let mut lipsum_reader = StringReader::new(SEARCH_TEXT);
+        let mut lipsum_reader = Cursor::new(SEARCH_TEXT);
         // This test is a little bit of a cheat, because it doesn't test what's actually inputted by the CLI,
         // but it does make sure the functionality works as expected
         let res = scan_pattern_to_printer(&mut lipsum_reader, "(?i)INTEGRAL", &mock_printer);
@@ -202,7 +203,7 @@ mod tests {
         let broken_pipe_err =
             print::Error::from(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"));
         mock_printer.fail_next(broken_pipe_err);
-        let mut lipsum_reader = StringReader::new(SEARCH_TEXT);
+        let mut lipsum_reader = Cursor::new(SEARCH_TEXT);
         let res = scan_pattern_to_printer(&mut lipsum_reader, pattern, &mock_printer);
 
         assert!(!res.is_err(), "failed to search: {:?}", res.unwrap_err());
