@@ -79,7 +79,7 @@ fn main() {
     let args = args_parse_result.unwrap();
     let open_file_result = open_file(args.file);
     if let Err(err) = open_file_result {
-        print_error(format!("Failed to open input file: {}", err));
+        print_error(&format!("Failed to open input file: {}", err));
         process::exit(2);
     }
 
@@ -91,12 +91,12 @@ fn main() {
     let scan_result = hline::scan_pattern(opened_file, &args.pattern);
     if let Err(err) = scan_result {
         // the lib crate provides the context for the errors in their error messages
-        print_error(err);
+        print_error(&err);
         process::exit(3);
     }
 }
 
-fn print_error<T: Display>(error_msg: T) {
+fn print_error<T: Display + ?Sized>(error_msg: &T) {
     eprintln!(
         "{color}error:{reset} {err}",
         color = Fg(LightRed),
@@ -174,7 +174,7 @@ fn handle_potentially_binary_file(opened_file: &mut OpenedFile) {
         Err(err) => {
             // This could probably be done nicer with a macro but I don't care about a small allocation like this
             // when we're immediately about to quit anyway
-            print_error(format!("failed to peek file: {}", err));
+            print_error(&format!("failed to peek file: {}", err));
             process::exit(4);
         }
         Ok(val) => val,
