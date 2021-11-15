@@ -145,13 +145,13 @@ fn open_file(file: PassedFile) -> Result<OpenedFile, io::Error> {
         PassedFile::Stdin => Ok(OpenedFile::Stdin(io::stdin())),
         PassedFile::Path(path) => {
             let file = File::open(path)?;
-            assert_is_directory(&file)?;
+            assert_is_not_directory(&file)?;
             Ok(OpenedFile::File(file))
         }
     }
 }
 
-fn assert_is_directory(file: &File) -> Result<(), io::Error> {
+fn assert_is_not_directory(file: &File) -> Result<(), io::Error> {
     let metadata = file.metadata()?;
     if metadata.is_dir() {
         Err(io::Error::new(
