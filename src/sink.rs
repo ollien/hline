@@ -96,10 +96,9 @@ impl<P: Printer> Sink for ContextPrintingSink<P> {
     ) -> Result<bool, Self::Error> {
         Self::validate_searcher(searcher);
 
-        let print_res = self.printer.colored_print(
-            Fg(LightRed),
-            std::str::from_utf8(sink_match.bytes()).unwrap(),
-        );
+        let print_res = self
+            .printer
+            .colored_print(Fg(LightRed), String::from_utf8_lossy(sink_match.bytes()));
 
         Self::get_sink_result_for_print_result(print_res)
     }
@@ -111,7 +110,7 @@ impl<P: Printer> Sink for ContextPrintingSink<P> {
     ) -> Result<bool, Self::Error> {
         Self::validate_searcher(searcher);
 
-        let data = std::str::from_utf8(context.bytes()).unwrap();
+        let data = String::from_utf8_lossy(context.bytes());
         let print_res = self.printer.print(data);
 
         Self::get_sink_result_for_print_result(print_res)
