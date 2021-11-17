@@ -1,6 +1,7 @@
 #![warn(clippy::all, clippy::pedantic)]
 use clap::{crate_name, crate_version, App, AppSettings, Arg, ArgMatches};
 use hline::file;
+use hline::file::ReadRecorder;
 use std::env;
 use std::fmt::Display;
 use std::fs::File;
@@ -16,7 +17,7 @@ const OK_IF_BINARY_ARG_NAME: &str = "ok-if-binary";
 
 /// `OpenedFile` represents some kind of file that was opened for further handling by `hl`
 enum OpenedFile {
-    Stdin(Stdin),
+    Stdin(ReadRecorder<Stdin>),
     File(File),
 }
 
@@ -142,7 +143,11 @@ fn setup_arg_parser() -> App<'static, 'static> {
 /// Open the file that was passed to the command line
 fn open_file(file: PassedFile) -> Result<OpenedFile, io::Error> {
     match file {
-        PassedFile::Stdin => Ok(OpenedFile::Stdin(io::stdin())),
+        PassedFile::Stdin => {
+            let stdin = io::stdin();
+            let recorded_stdin = ReadRecorder::new(stdin);
+            Ok(OpenedFile::Stdin(recorded_stdin))
+        }
         PassedFile::Path(path) => {
             let file = File::open(path)?;
             assert_is_not_directory(&file)?;
@@ -189,7 +194,13 @@ fn handle_potentially_binary_file(opened_file: &mut OpenedFile) {
 // Check if a given file is a binary file (or not possible to be easily checked)
 fn should_treat_as_binary_file(opened_file: &mut OpenedFile) -> Result<bool, io::Error> {
     match opened_file {
-        OpenedFile::Stdin(_) => Ok(false),
+        OpenedFile::Stdin(stdin) => {
+            stdin.start_recording();
+            let is_likely_utf8 = file::is_file_likely_utf8(stdin)?;
+            stdin.stop_recording();
+            stdin.rewind_to_start_of_recording();
+            Ok(!is_likely_utf8)
+        }
         OpenedFile::File(file) => {
             let is_likely_utf8 = file::is_file_likely_utf8(file)?;
             file.rewind()?;
