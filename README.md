@@ -26,4 +26,11 @@ ARGS:
     <filename>    The file to scan. If not specified, reads from stdin
 ```
 
+## Installation
+
+```
+cargo install hline
+```
+
+
 ### [Changelog](CHANGELOG.md)
