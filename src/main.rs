@@ -196,15 +196,15 @@ fn should_treat_as_binary_file(opened_file: &mut OpenedFile) -> Result<bool, io:
     match opened_file {
         OpenedFile::Stdin(stdin) => {
             stdin.start_recording();
-            let is_likely_utf8 = file::is_file_likely_utf8(stdin)?;
+            let is_likely_binary = file::utf8::is_file_likely_binary(stdin)?;
             stdin.stop_recording();
             stdin.rewind_to_start_of_recording();
-            Ok(!is_likely_utf8)
+            Ok(is_likely_binary)
         }
         OpenedFile::File(file) => {
-            let is_likely_utf8 = file::is_file_likely_utf8(file)?;
+            let is_likely_binary = file::utf8::is_file_likely_binary(file)?;
             file.rewind()?;
-            Ok(!is_likely_utf8)
+            Ok(is_likely_binary)
         }
     }
 }

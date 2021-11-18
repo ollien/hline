@@ -215,7 +215,7 @@ mod tests {
         let mut recorder = ReadRecorder::new(s_reader);
         recorder.start_recording();
 
-        // Read through the full string once to initialize the reocrding
+        // Read through the full string once to initialize the recording
         recorder
             .read_to_string(&mut String::new())
             .expect("reading failed unexpectedly");
