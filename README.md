@@ -1,5 +1,7 @@
 # hline
 
+[![crates.io](https://img.shields.io/crates/v/hline.svg)](https://crates.io/crates/hline)
+
 `hline` is a very small command line utility designed to highlight lines in log files. In practice, I've found that
 tuning the context that `grep` gives me when `tail -f`ing a log can be quite cumbersome. Oftentimes, all I really
 care about is seeing that a certain message happened and some surrounding context. `hline` fills that niche!
