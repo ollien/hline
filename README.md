@@ -9,7 +9,7 @@ care about is seeing that a certain message happened and some surrounding contex
 ## Usage
 
 ```
-hline 0.2.0
+hline 0.2.1
 Highlights lines that match the given regular expression
 
 USAGE:
