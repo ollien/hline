@@ -16,6 +16,7 @@ pub(crate) type Result = result::Result<(), Error>;
 /// errors. This could be done with `io::Error::kind`, but this wrapper makes it explicit it should be handled with an
 /// action such as terminating gracefully.  It's silly and annoying, but it's how it is.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum Error {
     #[error("{0}")]
     BrokenPipe(io::Error),
